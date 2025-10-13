@@ -752,25 +752,28 @@
             return new Date(year, month, 0).getDate();
         }
 
-        // Get current simulated date
-        function getCurrentDate() {
-            return new Date(currentYear, currentMonth - 1, currentDay);
+        // Get current simulated date string (YYYY-MM-DD)
+        function getCurrentDateStr() {
+            return `${currentYear}-${currentMonth.toString().padStart(2, '0')}-${currentDay.toString().padStart(2, '0')}`;
         }
 
-        // Filter expenses up to current day in the simulated month
+        // Get month start date string (YYYY-MM-01)
+        function getMonthStartStr() {
+            return `${currentYear}-${currentMonth.toString().padStart(2, '0')}-01`;
+        }
+
+        // Filter expenses up to current day in the simulated month (using string comparison to avoid timezone issues)
         function getExpensesUpToToday() {
-            const today = getCurrentDate();
-            const simMonthStart = new Date(currentYear, currentMonth - 1, 1);
+            const todayStr = getCurrentDateStr();
+            const simMonthStartStr = getMonthStartStr();
             return expenses.filter(exp => {
-                const expDate = new Date(exp.date);
-                return expDate >= simMonthStart && expDate <= today;
+                return exp.date >= simMonthStartStr && exp.date <= todayStr;
             });
         }
 
-        // Get today's expenses
+        // Get today's expenses (using string comparison to avoid timezone issues)
         function getTodayExpenses() {
-            const today = getCurrentDate();
-            const todayStr = today.toISOString().split('T')[0];
+            const todayStr = getCurrentDateStr();
             return expenses.filter(exp => exp.date === todayStr);
         }
 
@@ -823,16 +826,15 @@
             const ctxLine = document.getElementById('lineChart').getContext('2d');
             if (lineChart) lineChart.destroy();
 
-            // Generate cumulative data for days 1 to currentDay
+            // Generate cumulative data for days 1 to currentDay (using string comparison to avoid timezone issues)
             const cumulativeData = [];
             const daysInMonth = getDaysInMonth(currentMonth, currentYear);
             const maxDaysForChart = Math.min(currentDay, daysInMonth);
+            const monthStartStr = getMonthStartStr();
             for (let day = 1; day <= maxDaysForChart; day++) {
-                const dayDate = new Date(currentYear, currentMonth - 1, day);
+                const dayStr = `${currentYear}-${currentMonth.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
                 const dayExpenses = expenses.filter(exp => {
-                    const expDate = new Date(exp.date);
-                    const monthStart = new Date(currentYear, currentMonth - 1, 1);
-                    return expDate >= monthStart && expDate <= dayDate;
+                    return exp.date >= monthStartStr && exp.date <= dayStr;
                 });
                 const cumTotal = dayExpenses.reduce((sum, exp) => sum + exp.amount, 0);
                 cumulativeData.push(cumTotal);
@@ -925,4 +927,5 @@
 </body>
 </html>
 ```
+
 
