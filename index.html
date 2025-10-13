@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -141,6 +142,23 @@
         }
         .simulate-group {
             grid-column: span 2;
+        }
+        .simulation-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .simulation-controls label {
+            font-weight: 600;
+            margin-right: 5px;
+        }
+        .simulation-controls select,
+        .simulation-controls input {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
         }
         .feedback-form {
             background: var(--card-bg);
@@ -324,6 +342,7 @@
             .modal-content { width: 95%; margin: 10% auto; padding: 15px; }
             .theme-toggle { position: static; display: block; margin: 0 auto 20px; width: 200px; }
             canvas { max-height: 300px; }
+            .simulation-controls { flex-direction: column; align-items: flex-start; }
         }
         @media (max-width: 480px) {
             .header .date-time { font-size: 0.8em; }
@@ -381,12 +400,35 @@
 
         <div class="container">
             <div class="form-group simulate-group">
-                <h2>Simulate Day (for Testing)</h2>
-                <label for="dayInput">Day of September 2025:</label>
-                <input type="number" id="dayInput" min="1" max="30" value="17" style="width: 100px; display: inline-block;">
-                <button class="reset-data" style="width: auto; margin-left: 10px; padding: 10px 20px;">Reset Data</button>
-                <p>Current simulated day: <span id="currentDayDisplay">17</span> of September 2025</p>
-                <p>Change the day to see results update for any day in the month.</p>
+                <h2>Simulate Month (for Testing)</h2>
+                <div class="simulation-controls">
+                    <label for="monthSelect">Month:</label>
+                    <select id="monthSelect">
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7">July</option>
+                        <option value="8">August</option>
+                        <option value="9" selected>September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
+                    <label for="yearSelect">Year:</label>
+                    <select id="yearSelect">
+                        <option value="2024">2024</option>
+                        <option value="2025" selected>2025</option>
+                        <option value="2026">2026</option>
+                    </select>
+                    <label for="dayInput">Day:</label>
+                    <input type="number" id="dayInput" min="1" max="31" value="17" style="width: 80px; display: inline-block;">
+                    <button class="reset-data" style="width: auto; padding: 8px 16px;">Reset Data</button>
+                </div>
+                <p>Current simulated date: <span id="currentDayDisplay">17</span> of <span id="currentMonthDisplay">September</span> <span id="currentYearDisplay">2025</span></p>
+                <p>Change the month, year, or day to simulate and see results update. Expenses can only be added up to the current simulated date.</p>
             </div>
         </div>
         
@@ -465,7 +507,422 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
-</body>
+    <script>
+        // Global variables
+        let expenses = [];
+        let income = 0;
+        let currentCurrency = 'USD';
+        let currentDay = 17;
+        let currentMonth = 9; // September
+        let currentYear = 2025;
+        let lineChart, pieChart;
 
+        // Month names
+        const monthNames = [
+            '', 'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+
+        // Currency symbols
+        const currencySymbols = {
+            USD: '$',
+            EUR: '€',
+            GBP: '£',
+            JPY: '¥',
+            INR: '₹'
+        };
+
+        // Initialize app
+        function init() {
+            loadData();
+            setupEventListeners();
+            updateSimulation(); // Set initial simulation settings
+            updateDisplay();
+            renderCharts();
+            updateDateTime();
+            setInterval(updateDateTime, 1000); // Update every second
+        }
+
+        // Update real-time date and time
+        function updateDateTime() {
+            const now = new Date();
+            const options = {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            };
+            const dateStr = now.toLocaleDateString('en-US', options);
+            const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            document.querySelector('.date-time').textContent = `${dateStr} | ${timeStr} IST`;
+        }
+
+        // Load data from localStorage
+        function loadData() {
+            const savedIncome = localStorage.getItem('income');
+            const savedCurrency = localStorage.getItem('currency') || 'USD';
+            const savedExpenses = localStorage.getItem('expenses');
+            const savedMonth = localStorage.getItem('currentMonth') || '9';
+            const savedYear = localStorage.getItem('currentYear') || '2025';
+
+            income = savedIncome ? parseFloat(savedIncome) : 0;
+            currentCurrency = savedCurrency;
+            expenses = savedExpenses ? JSON.parse(savedExpenses) : [];
+            currentMonth = parseInt(savedMonth);
+            currentYear = parseInt(savedYear);
+
+            document.getElementById('currencySelect').value = currentCurrency;
+            document.getElementById('incomeInput').value = income;
+            document.getElementById('monthSelect').value = currentMonth;
+            document.getElementById('yearSelect').value = currentYear;
+            document.getElementById('currentIncome').textContent = `Current Income: ${currencySymbols[currentCurrency]}${income.toFixed(2)}`;
+        }
+
+        // Save data to localStorage
+        function saveData() {
+            localStorage.setItem('income', income);
+            localStorage.setItem('currency', currentCurrency);
+            localStorage.setItem('expenses', JSON.stringify(expenses));
+            localStorage.setItem('currentMonth', currentMonth);
+            localStorage.setItem('currentYear', currentYear);
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Theme toggle
+            document.querySelector('.theme-toggle').addEventListener('click', toggleTheme);
+
+            // Set income
+            document.querySelector('.set-income').addEventListener('click', setIncome);
+
+            // Add expense
+            document.querySelector('.add-expense').addEventListener('click', addExpense);
+
+            // Reset data
+            document.querySelector('.reset-data').addEventListener('click', resetData);
+
+            // Simulation changes
+            document.getElementById('monthSelect').addEventListener('change', updateSimulation);
+            document.getElementById('yearSelect').addEventListener('change', updateSimulation);
+            document.getElementById('dayInput').addEventListener('input', updateSimulation);
+
+            // Currency change
+            document.getElementById('currencySelect').addEventListener('change', (e) => {
+                currentCurrency = e.target.value;
+                saveData();
+                updateDisplay();
+                renderCharts();
+            });
+
+            // Summary modal
+            document.querySelector('.summary-button').addEventListener('click', openSummaryModal);
+
+            // Close modal
+            document.querySelector('.close').addEventListener('click', closeSummaryModal);
+
+            // Feedback
+            document.querySelector('.submit-feedback').addEventListener('click', submitFeedback);
+
+            // Close modal on outside click
+            window.addEventListener('click', (e) => {
+                const modal = document.getElementById('summaryModal');
+                if (e.target === modal) closeSummaryModal();
+            });
+        }
+
+        // Toggle theme
+        function toggleTheme() {
+            const body = document.body;
+            const button = document.querySelector('.theme-toggle');
+            if (body.hasAttribute('data-theme')) {
+                body.removeAttribute('data-theme');
+                button.textContent = '🌙 Dark Mode';
+            } else {
+                body.setAttribute('data-theme', 'dark');
+                button.textContent = '☀️ Light Mode';
+            }
+        }
+
+        // Set income
+        function setIncome() {
+            const input = document.getElementById('incomeInput');
+            const value = parseFloat(input.value);
+            if (isNaN(value) || value < 0) {
+                alert('Please enter a valid income amount.');
+                return;
+            }
+            income = value;
+            saveData();
+            document.getElementById('currentIncome').textContent = `Current Income: ${currencySymbols[currentCurrency]}${income.toFixed(2)}`;
+            updateDisplay();
+            renderCharts();
+        }
+
+        // Add expense
+        function addExpense() {
+            const amountInput = document.getElementById('amountInput');
+            const categoryInput = document.getElementById('categoryInput');
+            const dateInput = document.getElementById('dateInput');
+            const notesInput = document.getElementById('notesInput');
+
+            const amount = parseFloat(amountInput.value);
+            if (isNaN(amount) || amount <= 0) {
+                alert('Please enter a valid amount.');
+                return;
+            }
+
+            let date = dateInput.value;
+            const monthYearStr = `${currentYear}-${currentMonth.toString().padStart(2, '0')}`;
+
+            if (!date) {
+                // Default to current simulated date
+                date = `${monthYearStr}-${currentDay.toString().padStart(2, '0')}`;
+                dateInput.value = date;
+            }
+
+            // Validate date is in selected month/year and <= current simulated day
+            if (!date.startsWith(monthYearStr)) {
+                alert(`Please use a date in ${monthNames[currentMonth]} ${currentYear} for simulation.`);
+                return;
+            }
+
+            const selectedDay = parseInt(date.split('-')[2]);
+            if (selectedDay > currentDay) {
+                alert(`Expense date cannot be beyond the current simulated day (${currentDay}) of ${monthNames[currentMonth]} ${currentYear}. Please select a date up to day ${currentDay}.`);
+                return;
+            }
+
+            const expense = {
+                amount,
+                category: categoryInput.value,
+                date,
+                notes: notesInput.value
+            };
+
+            expenses.push(expense);
+            saveData();
+
+            // Clear form (keep date as default for next entry)
+            amountInput.value = '';
+            notesInput.value = '';
+
+            updateDisplay();
+            renderCharts();
+        }
+
+        // Reset data
+        function resetData() {
+            if (confirm('Are you sure you want to reset all data?')) {
+                localStorage.clear();
+                expenses = [];
+                income = 0;
+                document.getElementById('incomeInput').value = '';
+                document.getElementById('currentIncome').textContent = `Current Income: ${currencySymbols[currentCurrency]}0.00`;
+                updateDisplay();
+                renderCharts();
+            }
+        }
+
+        // Update simulation settings
+        function updateSimulation() {
+            currentMonth = parseInt(document.getElementById('monthSelect').value);
+            currentYear = parseInt(document.getElementById('yearSelect').value);
+            currentDay = Math.min(parseInt(document.getElementById('dayInput').value) || 1, getDaysInMonth(currentMonth, currentYear));
+
+            // Update displays
+            document.getElementById('currentDayDisplay').textContent = currentDay;
+            document.getElementById('currentMonthDisplay').textContent = monthNames[currentMonth];
+            document.getElementById('currentYearDisplay').textContent = currentYear;
+            document.getElementById('dayInput').value = currentDay;
+
+            // Set max date for date input to current simulated date
+            const monthYearStr = `${currentYear}-${currentMonth.toString().padStart(2, '0')}`;
+            const maxDate = `${monthYearStr}-${currentDay.toString().padStart(2, '0')}`;
+            const dateInput = document.getElementById('dateInput');
+            dateInput.max = maxDate;
+            dateInput.value = maxDate; // Default to today
+
+            saveData();
+            updateDisplay();
+            renderCharts();
+        }
+
+        // Get days in month
+        function getDaysInMonth(month, year) {
+            return new Date(year, month, 0).getDate();
+        }
+
+        // Get current simulated date
+        function getCurrentDate() {
+            return new Date(currentYear, currentMonth - 1, currentDay);
+        }
+
+        // Filter expenses up to current day in the simulated month
+        function getExpensesUpToToday() {
+            const today = getCurrentDate();
+            const simMonthStart = new Date(currentYear, currentMonth - 1, 1);
+            return expenses.filter(exp => {
+                const expDate = new Date(exp.date);
+                return expDate >= simMonthStart && expDate <= today;
+            });
+        }
+
+        // Get today's expenses
+        function getTodayExpenses() {
+            const today = getCurrentDate();
+            const todayStr = today.toISOString().split('T')[0];
+            return expenses.filter(exp => exp.date === todayStr);
+        }
+
+        // Calculate totals
+        function calculateTotals() {
+            const upToToday = getExpensesUpToToday();
+            const todayExpenses = getTodayExpenses();
+
+            const monthlyTotal = upToToday.reduce((sum, exp) => sum + exp.amount, 0);
+            const dailyTotal = todayExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+            const remaining = Math.max(0, income - monthlyTotal);
+
+            return { monthlyTotal, dailyTotal, remaining };
+        }
+
+        // Category breakdown
+        function getCategoryBreakdown() {
+            const upToToday = getExpensesUpToToday();
+            const categories = {};
+            upToToday.forEach(exp => {
+                categories[exp.category] = (categories[exp.category] || 0) + exp.amount;
+            });
+            return Object.entries(categories).map(([category, amount]) => ({ category, amount }));
+        }
+
+        // Update display (stats)
+        function updateDisplay() {
+            const { monthlyTotal, dailyTotal, remaining } = calculateTotals();
+            const symbol = currencySymbols[currentCurrency];
+
+            document.getElementById('monthlyStat').textContent = `${symbol}${monthlyTotal.toFixed(2)}`;
+            document.getElementById('dailyStat').textContent = `${symbol}${dailyTotal.toFixed(2)}`;
+            document.getElementById('remainingStat').textContent = `${symbol}${remaining.toFixed(2)}`;
+
+            // Update summary content in modal
+            document.getElementById('summaryContent').innerHTML = `
+                <p><strong>Total Expenses (Up to Day ${currentDay} of ${monthNames[currentMonth]} ${currentYear}):</strong> ${symbol}${monthlyTotal.toFixed(2)}</p>
+                <p><strong>Today's Expenses:</strong> ${symbol}${dailyTotal.toFixed(2)}</p>
+                <p><strong>Remaining Budget:</strong> ${symbol}${remaining.toFixed(2)}</p>
+            `;
+        }
+
+        // Render charts
+        function renderCharts() {
+            const symbol = currencySymbols[currentCurrency];
+            const { monthlyTotal } = calculateTotals();
+            const categories = getCategoryBreakdown();
+
+            // Line Chart: Cumulative expenses vs income
+            const ctxLine = document.getElementById('lineChart').getContext('2d');
+            if (lineChart) lineChart.destroy();
+
+            // Generate cumulative data for days 1 to currentDay
+            const cumulativeData = [];
+            const daysInMonth = getDaysInMonth(currentMonth, currentYear);
+            const maxDaysForChart = Math.min(currentDay, daysInMonth);
+            for (let day = 1; day <= maxDaysForChart; day++) {
+                const dayDate = new Date(currentYear, currentMonth - 1, day);
+                const dayExpenses = expenses.filter(exp => {
+                    const expDate = new Date(exp.date);
+                    const monthStart = new Date(currentYear, currentMonth - 1, 1);
+                    return expDate >= monthStart && expDate <= dayDate;
+                });
+                const cumTotal = dayExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+                cumulativeData.push(cumTotal);
+            }
+
+            lineChart = new Chart(ctxLine, {
+                type: 'line',
+                data: {
+                    labels: Array.from({ length: maxDaysForChart }, (_, i) => `Day ${i + 1}`),
+                    datasets: [
+                        {
+                            label: 'Cumulative Expenses',
+                            data: cumulativeData,
+                            borderColor: 'rgb(239, 68, 68)',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            tension: 0.1
+                        },
+                        {
+                            label: `Monthly Income (${symbol}${income.toFixed(2)})`,
+                            data: Array(maxDaysForChart).fill(monthlyTotal > income ? income : monthlyTotal),
+                            borderColor: 'rgb(16, 185, 129)',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            borderDash: [5, 5]
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+
+            // Pie Chart: By category
+            const ctxPie = document.getElementById('pieChart').getContext('2d');
+            if (pieChart) pieChart.destroy();
+
+            const pieLabels = categories.map(c => c.category);
+            const pieData = categories.map(c => c.amount);
+
+            pieChart = new Chart(ctxPie, {
+                type: 'pie',
+                data: {
+                    labels: pieLabels,
+                    datasets: [{
+                        data: pieData,
+                        backgroundColor: [
+                            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                            '#FF9F40', '#FF6384', '#C9CBCF'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+
+        // Open summary modal
+        function openSummaryModal() {
+            updateDisplay(); // Refresh summary
+            document.getElementById('summaryModal').style.display = 'block';
+        }
+
+        // Close summary modal
+        function closeSummaryModal() {
+            document.getElementById('summaryModal').style.display = 'none';
+        }
+
+        // Submit feedback (simple console log for demo)
+        function submitFeedback() {
+            const message = document.getElementById('feedbackMessage').value;
+            if (!message.trim()) {
+                document.getElementById('feedbackStatus').textContent = 'Please enter feedback.';
+                return;
+            }
+            console.log('Feedback:', message); // In real app, send to server
+            document.getElementById('feedbackStatus').textContent = 'Thank you for your feedback!';
+            document.getElementById('feedbackMessage').value = '';
+            setTimeout(() => { document.getElementById('feedbackStatus').textContent = ''; }, 3000);
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
 </html>
+```
+
