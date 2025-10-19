@@ -4,12 +4,12 @@ A dynamic web app for visualizing income vs. expenses with real-time charts and 
 
 ## Features
 - **Interactive Charts**: Line and pie charts update dynamically as you add expenses.
-- **Date Simulation**: Freely navigate between days (1-30) in September 2025 to see cumulative effects.
+- **Date Simulation**: Freely navigate between days (1-30) to see cumulative effects.
 - **Multi-Currency Support**: Switch between USD, EUR, GBP, JPY, INR.
 - **Expense Categories**: Track Food, Transport, Entertainment, Bills, Shopping, Healthcare, Education, Other.
 - **Local Data Persistence**: All data saved in browser storage for quick testing.
 - **Security**: CSP protects against XSS; input sanitization for notes.
-- **Feedback Form**: Share thoughts directly (simulated for now; backend-ready).
+- **Feedback Form**: Share thoughts directly (simulated for now).
 
 ## Quick Start
 1. Clone or download the repo.
